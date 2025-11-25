@@ -53,10 +53,21 @@ jobs:
         run: |
           pyinstaller build.spec
 
+      - name: List dist contents
+        run: |
+          ls -la dist/
+
       - name: Create archive
         run: |
           cd dist
-          zip -r ../VideoEditor-macOS.zip VideoEditor.app
+          if [ -d "VideoEditor.app" ]; then
+            zip -r ../VideoEditor-macOS.zip VideoEditor.app
+          elif [ -f "VideoEditor" ]; then
+            zip ../VideoEditor-macOS.zip VideoEditor
+          else
+            echo "Error: Could not find VideoEditor.app or VideoEditor in dist/"
+            exit 1
+          fi
           cd ..
 
       - name: Upload artifact
@@ -105,7 +116,7 @@ jobs:
   create-release:
     needs: [build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: ${{ always() && startsWith(github.ref, 'refs/tags/') }}
     permissions:
       contents: write
     steps:
@@ -113,16 +124,21 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
+
+      - name: List available artifacts
+        run: |
+          echo "Available artifacts:"
+          find artifacts -type f
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/VideoEditor-Windows/VideoEditor.exe
-            artifacts/VideoEditor-macOS/VideoEditor-macOS.zip
-            artifacts/VideoEditor-Linux/VideoEditor-Linux.tar.gz
+            artifacts/**/*
           draft: false
           prerelease: false
           generate_release_notes: true
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
