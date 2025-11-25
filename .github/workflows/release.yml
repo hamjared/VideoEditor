@@ -122,34 +122,30 @@ jobs:
     if: ${{ always() && startsWith(github.ref, 'refs/tags/') }}
     permissions:
       contents: write
+      pull-requests: write
+      repository-projects: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-          merge-multiple: true
 
       - name: List available artifacts
         run: |
           echo "Available artifacts:"
           find artifacts -type f
+          ls -R artifacts/
 
-      - name: Create Release with GitHub CLI
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Prepare files for upload
         run: |
-          # Get tag name
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          echo "Creating release for tag: $TAG_NAME"
+          mkdir -p release_files
+          find artifacts -type f -exec cp {} release_files/ \;
+          ls -la release_files/
 
-          # Create release and upload artifacts
-          gh release create "$TAG_NAME" \
-            --title "$TAG_NAME" \
-            --generate-notes \
-            artifacts/* || echo "Release might already exist, trying to upload artifacts..."
-
-          # If release exists, just upload the artifacts
-          gh release upload "$TAG_NAME" artifacts/* --clobber || true
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "release_files/*"
+          generateReleaseNotes: true
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
