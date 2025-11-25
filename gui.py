@@ -139,11 +139,20 @@ class VideoEditorGUI(QMainWindow):
         self.start_time_input.setFixedWidth(120)
         manual_layout.addWidget(self.start_time_input)
 
+        # Duration input
+        manual_layout.addWidget(QLabel("Duration:"))
+        self.duration_input = QLineEdit()
+        self.duration_input.setPlaceholderText("30 or 1:30 or 0:01:30")
+        self.duration_input.setFixedWidth(140)
+        self.duration_input.textChanged.connect(self.on_duration_changed)
+        manual_layout.addWidget(self.duration_input)
+
         # End time input
         manual_layout.addWidget(QLabel("End:"))
         self.end_time_input = QLineEdit()
         self.end_time_input.setPlaceholderText("00:00:00.000")
         self.end_time_input.setFixedWidth(120)
+        self.end_time_input.textChanged.connect(self.on_end_time_changed)
         manual_layout.addWidget(self.end_time_input)
 
         # Add button
@@ -278,6 +287,98 @@ class VideoEditorGUI(QMainWindow):
         except Exception as e:
             self.info_label.setText("No video information available")
 
+    def parse_timestamp_to_seconds(self, timestamp: str) -> float:
+        """Parse timestamp string to seconds (helper for GUI calculations)."""
+        try:
+            return self.editor.parse_timestamp(timestamp)
+        except:
+            return None
+
+    def parse_flexible_duration(self, duration: str) -> float:
+        """
+        Parse flexible duration format to seconds.
+        Supports:
+        - Seconds only: "30" or "30.5" -> 30.5 seconds
+        - MM:SS: "1:30" -> 90 seconds
+        - HH:MM:SS: "1:00:30" -> 3630 seconds
+        - HH:MM:SS.mmm: "1:00:30.500" -> 3630.5 seconds
+        """
+        if not duration:
+            return None
+
+        duration = duration.strip()
+
+        try:
+            # Check if it's just a number (seconds only)
+            if ':' not in duration:
+                return float(duration)
+
+            # Split by colon
+            parts = duration.split(':')
+
+            if len(parts) == 2:
+                # MM:SS or MM:SS.mmm format
+                minutes = int(parts[0])
+                seconds = float(parts[1])
+                return minutes * 60 + seconds
+            elif len(parts) == 3:
+                # HH:MM:SS or HH:MM:SS.mmm format
+                hours = int(parts[0])
+                minutes = int(parts[1])
+                seconds = float(parts[2])
+                return hours * 3600 + minutes * 60 + seconds
+            else:
+                return None
+        except:
+            return None
+
+    def format_seconds_to_timestamp(self, seconds: float) -> str:
+        """Format seconds to timestamp string (helper for GUI calculations)."""
+        try:
+            return self.editor.format_timestamp(seconds)
+        except:
+            return ""
+
+    def on_duration_changed(self):
+        """Calculate end time when duration is changed."""
+        start_time = self.start_time_input.text().strip()
+        duration = self.duration_input.text().strip()
+
+        if not start_time or not duration:
+            return
+
+        start_seconds = self.parse_timestamp_to_seconds(start_time)
+        duration_seconds = self.parse_flexible_duration(duration)
+
+        if start_seconds is not None and duration_seconds is not None:
+            end_seconds = start_seconds + duration_seconds
+            end_time = self.format_seconds_to_timestamp(end_seconds)
+
+            # Temporarily disconnect to avoid triggering on_end_time_changed
+            self.end_time_input.textChanged.disconnect(self.on_end_time_changed)
+            self.end_time_input.setText(end_time)
+            self.end_time_input.textChanged.connect(self.on_end_time_changed)
+
+    def on_end_time_changed(self):
+        """Calculate duration when end time is changed."""
+        start_time = self.start_time_input.text().strip()
+        end_time = self.end_time_input.text().strip()
+
+        if not start_time or not end_time:
+            return
+
+        start_seconds = self.parse_timestamp_to_seconds(start_time)
+        end_seconds = self.parse_timestamp_to_seconds(end_time)
+
+        if start_seconds is not None and end_seconds is not None and end_seconds > start_seconds:
+            duration_seconds = end_seconds - start_seconds
+            duration = self.format_seconds_to_timestamp(duration_seconds)
+
+            # Temporarily disconnect to avoid triggering on_duration_changed
+            self.duration_input.textChanged.disconnect(self.on_duration_changed)
+            self.duration_input.setText(duration)
+            self.duration_input.textChanged.connect(self.on_duration_changed)
+
     def add_clip(self):
         """Add a new clip."""
         clip_name = self.clip_name_input.text().strip()
@@ -289,7 +390,7 @@ class VideoEditorGUI(QMainWindow):
             return
 
         if not start_time or not end_time:
-            QMessageBox.warning(self, "Warning", "Please enter start and end times")
+            QMessageBox.warning(self, "Warning", "Please enter start and end times (or start and duration)")
             return
 
         try:
@@ -300,6 +401,7 @@ class VideoEditorGUI(QMainWindow):
             # Clear inputs
             self.clip_name_input.clear()
             self.start_time_input.clear()
+            self.duration_input.clear()
             self.end_time_input.clear()
 
             self.statusBar().showMessage(f"Clip '{clip_name}' added successfully")

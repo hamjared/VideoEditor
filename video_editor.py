@@ -390,8 +390,7 @@ class VideoEditor:
                 codec=codec,
                 audio_codec=audio_codec,
                 temp_audiofile=f'temp-audio-{clip_name}.m4a',
-                remove_temp=True,
-                logger=None  # Suppress moviepy progress bar
+                remove_temp=True
             )
             subclip.close()
 
