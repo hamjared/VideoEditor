@@ -123,6 +123,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -134,14 +137,19 @@ jobs:
           echo "Available artifacts:"
           find artifacts -type f
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            artifacts/**/*
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-          fail_on_unmatched_files: false
+      - name: Create Release with GitHub CLI
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get tag name
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "Creating release for tag: $TAG_NAME"
+
+          # Create release and upload artifacts
+          gh release create "$TAG_NAME" \
+            --title "$TAG_NAME" \
+            --generate-notes \
+            artifacts/* || echo "Release might already exist, trying to upload artifacts..."
+
+          # If release exists, just upload the artifacts
+          gh release upload "$TAG_NAME" artifacts/* --clobber || true
