@@ -50,6 +50,7 @@ class VideoEditorGUI(QMainWindow):
         self.editor = VideoEditor()
         self.output_dir = None
         self.export_worker = None
+        self.updating_table = False  # Flag to prevent recursive updates
         self.init_ui()
 
     def init_ui(self):
@@ -198,7 +199,8 @@ class VideoEditorGUI(QMainWindow):
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
 
         self.clips_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.clips_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.clips_table.setEditTriggers(QTableWidget.DoubleClicked)
+        self.clips_table.itemChanged.connect(self.on_table_cell_changed)
 
         layout.addWidget(self.clips_table)
 
@@ -409,6 +411,58 @@ class VideoEditorGUI(QMainWindow):
             QMessageBox.critical(self, "Error", f"Failed to add clip:\n{str(e)}")
             self.statusBar().showMessage("Failed to add clip")
 
+    def on_table_cell_changed(self, item):
+        """Handle cell editing in the clips table."""
+        if self.updating_table:
+            return
+
+        row = item.row()
+        col = item.column()
+
+        # Get all clip data from the row
+        clips_info = self.editor.get_clips_info()
+        if row >= len(clips_info):
+            return
+
+        old_clip = clips_info[row]
+        old_name = old_clip['name']
+
+        # Get current values from table
+        new_name = self.clips_table.item(row, 0).text().strip()
+        new_start = self.clips_table.item(row, 1).text().strip()
+        new_end = self.clips_table.item(row, 2).text().strip()
+        new_duration = self.clips_table.item(row, 3).text().strip()
+
+        try:
+            # If duration was edited (column 3), calculate new end time
+            if col == 3:
+                # Parse duration using flexible parser
+                duration_seconds = self.parse_flexible_duration(new_duration)
+                if duration_seconds is None:
+                    raise ValueError(f"Invalid duration format: {new_duration}")
+
+                # Parse start time
+                start_seconds = self.parse_timestamp_to_seconds(new_start)
+                if start_seconds is None:
+                    raise ValueError(f"Invalid start time: {new_start}")
+
+                # Calculate new end time
+                end_seconds = start_seconds + duration_seconds
+                new_end = self.format_seconds_to_timestamp(end_seconds)
+
+            # Validate and update the clip
+            self.editor.edit_clip(old_name, new_name, new_start, new_end)
+            self.statusBar().showMessage(f"Clip '{new_name}' updated successfully")
+
+            # Refresh to update duration and format timestamps
+            self.refresh_clips_table()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to update clip:\n{str(e)}")
+            # Revert the change
+            self.refresh_clips_table()
+            self.statusBar().showMessage("Failed to update clip")
+
     def import_clips(self):
         """Import clips from a CSV or Excel file."""
         if not self.editor.video_clip:
@@ -485,15 +539,23 @@ class VideoEditorGUI(QMainWindow):
 
     def refresh_clips_table(self):
         """Refresh the clips table."""
+        self.updating_table = True  # Prevent itemChanged signals during refresh
+
         clips_info = self.editor.get_clips_info()
         self.clips_table.setRowCount(len(clips_info))
 
         for row, clip in enumerate(clips_info):
-            self.clips_table.setItem(row, 0, QTableWidgetItem(clip['name']))
-            self.clips_table.setItem(row, 1, QTableWidgetItem(clip['start']))
-            self.clips_table.setItem(row, 2, QTableWidgetItem(clip['end']))
-            self.clips_table.setItem(row, 3, QTableWidgetItem(f"{clip['duration']:.2f}"))
+            name_item = QTableWidgetItem(clip['name'])
+            start_item = QTableWidgetItem(clip['start'])
+            end_item = QTableWidgetItem(clip['end'])
+            duration_item = QTableWidgetItem(f"{clip['duration']:.2f}")
 
+            self.clips_table.setItem(row, 0, name_item)
+            self.clips_table.setItem(row, 1, start_item)
+            self.clips_table.setItem(row, 2, end_item)
+            self.clips_table.setItem(row, 3, duration_item)
+
+        self.updating_table = False
         self.update_export_button()
 
     def remove_selected_clip(self):

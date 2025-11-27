@@ -141,6 +141,50 @@ class VideoEditor:
 
         self.clips[name] = (start_seconds, end_seconds)
 
+    def edit_clip(self, old_name: str, new_name: str, start: str, end: str) -> None:
+        """
+        Edit an existing clip definition.
+
+        Args:
+            old_name: Current name of the clip
+            new_name: New name for the clip
+            start: New start timestamp (HH:MM:SS or HH:MM:SS.mmm)
+            end: New end timestamp (HH:MM:SS or HH:MM:SS.mmm)
+
+        Raises:
+            KeyError: If clip doesn't exist
+            ValueError: If timestamps are invalid or video not loaded
+        """
+        if old_name not in self.clips:
+            raise KeyError(f"Clip '{old_name}' not found")
+
+        if not self.video_clip:
+            raise ValueError("No video loaded. Load a video first.")
+
+        start_seconds = self.parse_timestamp(start)
+        end_seconds = self.parse_timestamp(end)
+
+        # Validate timestamps
+        if start_seconds < 0:
+            raise ValueError("Start time cannot be negative")
+
+        if end_seconds > self.video_clip.duration:
+            raise ValueError(
+                f"End time ({end_seconds}s) exceeds video duration "
+                f"({self.video_clip.duration}s)"
+            )
+
+        if start_seconds >= end_seconds:
+            raise ValueError("Start time must be before end time")
+
+        # If name changed, check if new name already exists (unless it's the same clip)
+        if new_name != old_name and new_name in self.clips:
+            raise ValueError(f"A clip named '{new_name}' already exists")
+
+        # Remove old clip and add with new data
+        del self.clips[old_name]
+        self.clips[new_name] = (start_seconds, end_seconds)
+
     def remove_clip(self, name: str) -> None:
         """
         Remove a clip definition.
