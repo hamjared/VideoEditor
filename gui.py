@@ -12,6 +12,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from video_editor import VideoEditor
+from video_player.media_player_factory import MediaPlayerFactory
 
 
 class ExportWorker(QThread):
@@ -56,32 +57,46 @@ class VideoEditorGUI(QMainWindow):
     def init_ui(self):
         """Initialize the user interface."""
         self.setWindowTitle('Simple Video Editor')
-        self.setGeometry(100, 100, 900, 700)
+        self.setGeometry(100, 100, 1200, 800)
 
         # Create central widget and main layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
+        main_layout = QHBoxLayout(central_widget)
+
+        # Left side - Video player
+        left_layout = QVBoxLayout()
 
         # File section
         file_group = self.create_file_section()
-        main_layout.addWidget(file_group)
+        left_layout.addWidget(file_group)
+
+        # Video player section
+        player_group = self.create_player_section()
+        left_layout.addWidget(player_group)
 
         # Video info section
         info_group = self.create_info_section()
-        main_layout.addWidget(info_group)
+        left_layout.addWidget(info_group)
+
+        main_layout.addLayout(left_layout, 1)
+
+        # Right side - Clip management
+        right_layout = QVBoxLayout()
 
         # Add clip section
         add_clip_group = self.create_add_clip_section()
-        main_layout.addWidget(add_clip_group)
+        right_layout.addWidget(add_clip_group)
 
         # Clips list section
         clips_group = self.create_clips_list_section()
-        main_layout.addWidget(clips_group)
+        right_layout.addWidget(clips_group)
 
         # Export section
         export_group = self.create_export_section()
-        main_layout.addWidget(export_group)
+        right_layout.addWidget(export_group)
+
+        main_layout.addLayout(right_layout, 1)
 
         # Status bar
         self.statusBar().showMessage('Ready')
@@ -100,6 +115,33 @@ class VideoEditorGUI(QMainWindow):
 
         layout.addWidget(self.file_label)
         layout.addWidget(load_btn)
+
+        group.setLayout(layout)
+        return group
+
+    def create_player_section(self):
+        """Create the video player section."""
+        group = QGroupBox("Video Player")
+        layout = QVBoxLayout()
+
+        # Create video player widget
+        self.video_player = MediaPlayerFactory.create_player()
+
+        if self.video_player:
+            # Connect mark buttons to populate input fields
+            self.video_player.mark_start_clicked.connect(self.on_mark_start)
+            self.video_player.mark_end_clicked.connect(self.on_mark_end)
+            layout.addWidget(self.video_player)
+        else:
+            # No player available
+            no_player_label = QLabel(
+                "No video player available.\n\n"
+                "Install opencv-python for video preview:\n"
+                "pip install opencv-python"
+            )
+            no_player_label.setStyleSheet("padding: 20px; color: #888;")
+            no_player_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(no_player_label)
 
         group.setLayout(layout)
         return group
@@ -266,10 +308,16 @@ class VideoEditorGUI(QMainWindow):
 
         if file_path:
             try:
+                # Load into editor backend
                 self.editor.load_video(file_path)
                 self.file_label.setText(f"Loaded: {os.path.basename(file_path)}")
                 self.update_video_info()
                 self.refresh_clips_table()
+
+                # Load into video player if available
+                if self.video_player:
+                    self.video_player.load_video(file_path)
+
                 self.statusBar().showMessage(f"Video loaded: {file_path}")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to load video:\n{str(e)}")
@@ -380,6 +428,38 @@ class VideoEditorGUI(QMainWindow):
             self.duration_input.textChanged.disconnect(self.on_duration_changed)
             self.duration_input.setText(duration)
             self.duration_input.textChanged.connect(self.on_duration_changed)
+
+    def on_mark_start(self, timestamp):
+        """Handle mark start button from video player."""
+        self.start_time_input.setText(timestamp)
+        self.statusBar().showMessage(f"Start time marked: {timestamp}")
+
+    def on_mark_end(self, timestamp):
+        """Handle mark end button from video player."""
+        self.end_time_input.setText(timestamp)
+        self.statusBar().showMessage(f"End time marked: {timestamp}")
+
+        # Auto-create clip if both start and end times are set
+        start_time = self.start_time_input.text().strip()
+        if start_time and timestamp:
+            # Generate a filler name based on clip count
+            clip_count = len(self.editor.get_clips_info()) + 1
+            filler_name = f"Clip_{clip_count}"
+
+            try:
+                # Add clip with filler name
+                self.editor.add_clip(filler_name, start_time, timestamp)
+                self.refresh_clips_table()
+                self.update_export_button()
+
+                # Clear the input fields for next clip
+                self.clip_name_input.clear()
+                self.start_time_input.clear()
+                self.end_time_input.clear()
+
+                self.statusBar().showMessage(f"Clip '{filler_name}' created. Edit name in table if needed.")
+            except Exception as e:
+                self.statusBar().showMessage(f"Failed to create clip: {e}")
 
     def add_clip(self):
         """Add a new clip."""
@@ -675,6 +755,10 @@ class VideoEditorGUI(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close event."""
+        # Clean up video player if available
+        if self.video_player:
+            self.video_player.close_player()
+
         # Clean up video editor
         self.editor.close()
 

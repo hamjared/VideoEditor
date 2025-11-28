@@ -16,10 +16,42 @@ datas += copy_metadata('moviepy')
 datas += collect_data_files('imageio')
 datas += collect_data_files('imageio_ffmpeg')
 
+# Collect VLC DLLs as binaries (not data files)
+import os
+import glob
+
+binaries = []
+vlc_path = os.path.join(os.getcwd(), 'bin', 'win32', 'vlc')
+if os.path.exists(vlc_path):
+    # Add all DLL files from VLC directory
+    for dll in glob.glob(os.path.join(vlc_path, '*.dll')):
+        binaries.append((dll, 'bin/win32/vlc'))
+
+    # Add VLC plugins directory (as data files since they're loaded dynamically)
+    datas += [(os.path.join(vlc_path, 'plugins'), 'bin/win32/vlc/plugins')]
+
+    # Add other VLC directories
+    for subdir in ['locale', 'lua', 'hrtfs']:
+        subdir_path = os.path.join(vlc_path, subdir)
+        if os.path.exists(subdir_path):
+            datas += [(subdir_path, f'bin/win32/vlc/{subdir}')]
+
+# Include bundled executables (ffmpeg, ffplay)
+ffmpeg_path = os.path.join(os.getcwd(), 'bin', 'win32')
+if os.path.exists(ffmpeg_path):
+    for exe in ['ffmpeg.exe', 'ffplay.exe']:
+        exe_path = os.path.join(ffmpeg_path, exe)
+        if os.path.exists(exe_path):
+            binaries.append((exe_path, 'bin/win32'))
+
+    # Add ffmpeg DLLs
+    for dll in glob.glob(os.path.join(ffmpeg_path, '*.dll')):
+        binaries.append((dll, 'bin/win32'))
+
 a = Analysis(
     ['main.py'],
     pathex=[],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=[
         'moviepy',
@@ -36,6 +68,7 @@ a = Analysis(
         'pandas',
         'openpyxl',
         'openpyxl.cell._writer',
+        'vlc',
     ],
     hookspath=[],
     hooksconfig={},
