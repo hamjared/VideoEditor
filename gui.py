@@ -249,6 +249,10 @@ class VideoEditorGUI(QMainWindow):
         # Buttons
         btn_layout = QHBoxLayout()
 
+        seek_btn = QPushButton("Seek to Selected")
+        seek_btn.clicked.connect(self.seek_to_selected_clip)
+        btn_layout.addWidget(seek_btn)
+
         remove_btn = QPushButton("Remove Selected")
         remove_btn.clicked.connect(self.remove_selected_clip)
         btn_layout.addWidget(remove_btn)
@@ -637,6 +641,26 @@ class VideoEditorGUI(QMainWindow):
 
         self.updating_table = False
         self.update_export_button()
+
+    def seek_to_selected_clip(self):
+        """Seek video player to the start of the selected clip."""
+        selected_rows = self.clips_table.selectionModel().selectedRows()
+
+        if not selected_rows:
+            QMessageBox.warning(self, "Warning", "Please select a clip to seek to")
+            return
+
+        # Get start time from the second column (index 1)
+        row = selected_rows[0].row()
+        start_time = self.clips_table.item(row, 1).text()
+        clip_name = self.clips_table.item(row, 0).text()
+
+        # Seek the video player to this timestamp
+        if self.video_player and hasattr(self.video_player, 'seek_to_timestamp'):
+            self.video_player.seek_to_timestamp(start_time)
+            self.statusBar().showMessage(f"Seeked to clip '{clip_name}' at {start_time}")
+        else:
+            QMessageBox.warning(self, "Warning", "Video player not available")
 
     def remove_selected_clip(self):
         """Remove the selected clip."""

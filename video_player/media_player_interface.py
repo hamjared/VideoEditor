@@ -69,6 +69,16 @@ class MediaPlayerInterface(QWidget, metaclass=MediaPlayerMeta):
         """Clean up the media player resources."""
         pass
 
+    @abstractmethod
+    def seek_to_timestamp(self, timestamp: str):
+        """
+        Seek to a specific timestamp in the video.
+
+        Args:
+            timestamp: Timestamp string in format "HH:MM:SS.mmm"
+        """
+        pass
+
     @staticmethod
     def milliseconds_to_timestamp(milliseconds: int) -> str:
         """
@@ -87,6 +97,38 @@ class MediaPlayerInterface(QWidget, metaclass=MediaPlayerMeta):
         ms = int((seconds % 1) * 1000)
 
         return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
+
+    @staticmethod
+    def timestamp_to_milliseconds(timestamp: str) -> int:
+        """
+        Convert timestamp string to milliseconds.
+
+        Args:
+            timestamp: Timestamp string in format "HH:MM:SS.mmm" or "HH:MM:SS"
+
+        Returns:
+            Time in milliseconds
+        """
+        # Split by ':' to get hours, minutes, seconds
+        parts = timestamp.split(':')
+        if len(parts) != 3:
+            raise ValueError(f"Invalid timestamp format: {timestamp}")
+
+        hours = int(parts[0])
+        minutes = int(parts[1])
+
+        # Handle seconds with optional milliseconds
+        if '.' in parts[2]:
+            secs_parts = parts[2].split('.')
+            seconds = int(secs_parts[0])
+            milliseconds = int(secs_parts[1])
+        else:
+            seconds = int(parts[2])
+            milliseconds = 0
+
+        # Convert to total milliseconds
+        total_ms = (hours * 3600 + minutes * 60 + seconds) * 1000 + milliseconds
+        return total_ms
 
     @staticmethod
     def get_player_name() -> str:

@@ -24,6 +24,8 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
         super().__init__(parent)
         self.video_path = None
         self.is_playing = False
+        self.is_reverse_playing = False
+        self.reverse_speed = 1.0  # Multiplier for reverse speed
 
         # Set up bundled VLC path (Windows only, Linux uses system VLC)
         if getattr(sys, 'frozen', False):
@@ -157,6 +159,20 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
         # Playback controls
         controls_layout = QHBoxLayout()
 
+        # Reverse Fast button (<<)
+        self.reverse_fast_button = QPushButton("<<")
+        self.reverse_fast_button.clicked.connect(self.reverse_fast)
+        self.reverse_fast_button.setFixedWidth(40)
+        self.reverse_fast_button.setStyleSheet("font-weight: bold;")
+        controls_layout.addWidget(self.reverse_fast_button)
+
+        # Reverse Normal button (<)
+        self.reverse_button = QPushButton("<")
+        self.reverse_button.clicked.connect(self.reverse_normal)
+        self.reverse_button.setFixedWidth(40)
+        self.reverse_button.setStyleSheet("font-weight: bold;")
+        controls_layout.addWidget(self.reverse_button)
+
         # Play/Pause button
         self.play_button = QPushButton()
         self.play_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
@@ -165,19 +181,19 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
         self.play_button.setEnabled(False)
         controls_layout.addWidget(self.play_button)
 
-        # Increase Speed button (next to play button)
-        self.increase_speed_button = QPushButton(">>")
-        self.increase_speed_button.clicked.connect(self.increase_speed)
-        self.increase_speed_button.setFixedWidth(40)
-        self.increase_speed_button.setStyleSheet("font-weight: bold;")
-        controls_layout.addWidget(self.increase_speed_button)
-
         # Reset to 1x Speed button (without pausing)
         self.reset_speed_button = QPushButton(">")
         self.reset_speed_button.clicked.connect(self.reset_speed)
         self.reset_speed_button.setFixedWidth(40)
         self.reset_speed_button.setStyleSheet("font-weight: bold;")
         controls_layout.addWidget(self.reset_speed_button)
+
+        # Increase Speed button
+        self.increase_speed_button = QPushButton(">>")
+        self.increase_speed_button.clicked.connect(self.increase_speed)
+        self.increase_speed_button.setFixedWidth(40)
+        self.increase_speed_button.setStyleSheet("font-weight: bold;")
+        controls_layout.addWidget(self.increase_speed_button)
 
         # Stop button
         stop_button = QPushButton()
@@ -252,7 +268,11 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
         if not self.player:
             return
 
-        if self.player.is_playing():
+        # Disable reverse mode when using play/pause
+        if self.is_reverse_playing:
+            self.is_reverse_playing = False
+
+        if self.player.is_playing() or self.is_playing:
             self.player.pause()
             self.is_playing = False
             self.timer.stop()
@@ -275,6 +295,7 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
 
         self.player.stop()
         self.is_playing = False
+        self.is_reverse_playing = False
         self.timer.stop()
         self.position_slider.setValue(0)
         self.play_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
@@ -287,6 +308,20 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
         # Convert slider position (0-1000) to time position (0.0-1.0)
         position = value / 1000.0
         self.player.set_position(position)
+
+    def seek_to_timestamp(self, timestamp: str):
+        """Seek to a specific timestamp (HH:MM:SS.mmm format)."""
+        if not self.player or not self.player.get_length():
+            return
+
+        try:
+            # Convert timestamp to milliseconds
+            ms = self.timestamp_to_milliseconds(timestamp)
+            # Set player time in milliseconds
+            self.player.set_time(ms)
+            print(f"VLC Player: Seeked to {timestamp} ({ms}ms)")
+        except Exception as e:
+            print(f"VLC Player: Failed to seek to {timestamp}: {e}")
 
     def slider_pressed(self):
         """Called when user starts dragging slider."""
@@ -316,10 +351,61 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
         """Reset playback speed to 1x without pausing."""
         self.speed_combo.setCurrentText("1x")
 
+    def reverse_normal(self):
+        """Play video in reverse at normal speed."""
+        if not self.player:
+            return
+
+        # Pause the player (we'll handle reverse by seeking)
+        self.player.pause()
+
+        # Enable reverse playback mode at 1x speed
+        self.is_reverse_playing = True
+        self.reverse_speed = 1.0
+        self.is_playing = True
+
+        # Start the update timer
+        self.timer.start(100)
+        self.play_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPause))
+
+    def reverse_fast(self):
+        """Play video in reverse at fast speed (4x)."""
+        if not self.player:
+            return
+
+        # Pause the player (we'll handle reverse by seeking)
+        self.player.pause()
+
+        # Enable reverse playback mode at 4x speed
+        self.is_reverse_playing = True
+        self.reverse_speed = 4.0
+        self.is_playing = True
+
+        # Start the update timer
+        self.timer.start(100)
+        self.play_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPause))
+
     def update_ui(self):
         """Update UI elements during playback."""
         if not self.player:
             return
+
+        # Handle reverse playback by seeking backward
+        if self.is_reverse_playing:
+            current_time = self.player.get_time()
+            if current_time is not None and current_time > 0:
+                # Seek backward by 100ms * reverse_speed
+                jump_back = int(100 * self.reverse_speed)
+                new_time = max(0, current_time - jump_back)
+                self.player.set_time(new_time)
+
+                # Stop if we hit the beginning
+                if new_time == 0:
+                    self.is_reverse_playing = False
+                    self.player.pause()
+                    self.is_playing = False
+                    self.timer.stop()
+                    self.play_button.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
 
         # Update slider position (unless user is dragging it)
         if not self.slider_being_dragged:
