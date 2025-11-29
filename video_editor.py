@@ -15,23 +15,23 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class MoviePyLogger(ProgressBarLogger):
+class MoviePyLogger:
     """
     Custom logger for MoviePy that redirects output to Python logging.
-    This prevents stdout access issues in frozen executables while
-    maintaining visibility into the export process.
+    This prevents stdout access issues in frozen executables.
+    Does NOT inherit from ProgressBarLogger to avoid any stdout initialization.
     """
     def __init__(self):
-        # Initialize parent class properly but with minimal setup
-        # This sets up self.state and other required attributes
+        # Create minimal state without calling parent class
         from collections import OrderedDict
-        super().__init__(
-            bars=OrderedDict(),
-            ignored_bars=None,
-            logged_bars='all',
-            min_time_interval=0,
-            ignore_bars_under=0
-        )
+        self.state = {'bars': OrderedDict()}
+        self.stored = {}
+        self.logs = []
+        self.log_indent = 0
+        self.ignored_bars = None
+        self.logged_bars = 'all'
+        self.min_time_interval = 0
+        self.ignore_bars_under = 0
         self.logger = logging.getLogger('moviepy')
 
     def bars_callback(self, bar, attr, value, old_value=None):
@@ -57,10 +57,13 @@ class MoviePyLogger(ProgressBarLogger):
     def log(self, message):
         """Log MoviePy messages to our logging system."""
         if message:
-            # Parse message level if MoviePy includes it
             message_str = str(message).strip()
             if message_str:
                 self.logger.info(message_str)
+
+    def __call__(self, **changes):
+        """Handle direct calls (MoviePy compatibility)."""
+        self.callback(**changes)
 
 
 class VideoEditor:
