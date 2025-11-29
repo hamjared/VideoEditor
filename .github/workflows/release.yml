@@ -3,8 +3,8 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*'  # Trigger on version tags like v1.0.0
-  workflow_dispatch:  # Allow manual trigger
+      - "v*" # Trigger on version tags like v1.0.0
+  workflow_dispatch: # Allow manual trigger
 
 permissions:
   contents: write
@@ -15,11 +15,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
@@ -36,59 +38,18 @@ jobs:
           name: VideoEditor-Windows
           path: dist/VideoEditor.exe
 
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Build with PyInstaller
-        run: |
-          pyinstaller build.spec
-
-      - name: List dist contents
-        run: |
-          ls -la dist/
-
-      - name: Create archive
-        run: |
-          cd dist
-          if [ -d "VideoEditor.app" ]; then
-            zip -r ../VideoEditor-macOS.zip VideoEditor.app
-          elif [ -f "VideoEditor" ]; then
-            zip ../VideoEditor-macOS.zip VideoEditor
-          else
-            echo "Error: Could not find VideoEditor.app or VideoEditor in dist/"
-            exit 1
-          fi
-          cd ..
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: VideoEditor-macOS
-          path: VideoEditor-macOS.zip
-
   build-linux:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          lfs: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install system dependencies
         run: |
@@ -117,7 +78,7 @@ jobs:
           path: VideoEditor-Linux.tar.gz
 
   create-release:
-    needs: [build-windows, build-macos, build-linux]
+    needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
     if: ${{ always() && startsWith(github.ref, 'refs/tags/') }}
     steps:
