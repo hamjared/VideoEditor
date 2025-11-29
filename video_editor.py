@@ -22,19 +22,29 @@ class MoviePyLogger(ProgressBarLogger):
     maintaining visibility into the export process.
     """
     def __init__(self):
-        # Don't call super().__init__() to avoid any stdout initialization
-        self.bars = {}
+        # Initialize parent class properly but with minimal setup
+        # This sets up self.state and other required attributes
+        from collections import OrderedDict
+        super().__init__(
+            bars=OrderedDict(),
+            ignored_bars=None,
+            logged_bars='all',
+            min_time_interval=0,
+            ignore_bars_under=0
+        )
         self.logger = logging.getLogger('moviepy')
 
     def bars_callback(self, bar, attr, value, old_value=None):
         """Log progress bar updates at DEBUG level."""
         # Only log significant progress to avoid spam
         if attr == 'index' and value is not None and old_value is not None:
-            # Log every 10% progress
-            percentage = int((value / self.bars[bar]['total']) * 100) if self.bars.get(bar, {}).get('total') else 0
-            old_percentage = int((old_value / self.bars[bar]['total']) * 100) if old_value and self.bars.get(bar, {}).get('total') else 0
-            if percentage // 10 != old_percentage // 10:
-                self.logger.debug(f"Progress: {percentage}%")
+            bar_state = self.state.get('bars', {}).get(bar, {})
+            total = bar_state.get('total')
+            if total and total > 0:
+                percentage = int((value / total) * 100)
+                old_percentage = int((old_value / total) * 100)
+                if percentage // 10 != old_percentage // 10:
+                    self.logger.debug(f"Progress: {percentage}%")
 
     def callback(self, **changes):
         """Log callback messages."""
