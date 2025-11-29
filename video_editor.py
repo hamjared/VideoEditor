@@ -433,7 +433,17 @@ class VideoEditor:
 
             # Create a silent logger to suppress MoviePy progress output
             class SilentLogger(ProgressBarLogger):
+                def __init__(self):
+                    super().__init__()
+                    # Set print_messages to False to prevent stdout access
+                    self.print_messages = False
+
                 def bars_callback(self, bar, attr, value, old_value=None):
+                    # Suppress progress bar updates
+                    pass
+
+                def callback(self, **changes):
+                    # Suppress all callbacks
                     pass
 
             subclip.write_videofile(
