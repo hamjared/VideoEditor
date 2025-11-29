@@ -10,6 +10,10 @@ from PyQt5.QtCore import Qt, QTimer
 from .media_player_interface import MediaPlayerInterface
 import sys
 import os
+import logging
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 class VLCMediaPlayerWidget(MediaPlayerInterface):
@@ -56,7 +60,7 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
                 vlc_plugin_path = os.path.join(vlc_path, "plugins")
 
                 if os.path.exists(vlc_lib_path):
-                    print(f"VLC Player: Using bundled VLC from {vlc_path}")
+                    logger.info(f"Using bundled VLC from {vlc_path}")
 
                     # Add VLC directory to PATH so python-vlc can find the libraries
                     if vlc_path not in os.environ.get('PATH', ''):
@@ -73,13 +77,13 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
                     try:
                         vlc_core_dll = ctypes.CDLL(vlc_core_path)
                     except Exception as e:
-                        print(f"VLC Player: Failed to load libvlccore.dll: {e}")
+                        logger.error(f"Failed to load libvlccore.dll: {e}")
 
                     # Then load libvlc.dll
                     try:
                         vlc_dll = ctypes.CDLL(vlc_lib_path)
                     except Exception as e:
-                        print(f"VLC Player: Failed to load libvlc.dll: {e}")
+                        logger.error(f"Failed to load libvlc.dll: {e}")
 
                     # Now import python-vlc
                     import vlc
@@ -87,12 +91,12 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
                     # Create instance
                     self.instance = vlc.Instance()
                 else:
-                    print(f"VLC Player: Bundled VLC not found at {vlc_path}, using system VLC")
+                    logger.warning(f"Bundled VLC not found at {vlc_path}, using system VLC")
                     import vlc
                     self.instance = vlc.Instance()
             else:
                 # Linux - use system VLC
-                print(f"VLC Player: Using system VLC (Linux)")
+                logger.info("Using system VLC (Linux)")
                 import vlc
                 self.instance = vlc.Instance()
 
@@ -107,9 +111,7 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
             if self.player is None:
                 raise Exception("Failed to create media player - player is None")
         except Exception as e:
-            print(f"VLC Player: Failed to initialize VLC: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Failed to initialize VLC: {e}", exc_info=True)
             self.vlc = None
             self.instance = None
             self.player = None
@@ -240,7 +242,7 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
             return False
 
         if not self.player:
-            print("VLC Player: VLC not available")
+            logger.error("VLC not available, cannot load video")
             return False
 
         try:
@@ -256,11 +258,11 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
             self.mark_start_button.setEnabled(True)
             self.mark_end_button.setEnabled(True)
 
-            print(f"VLC Player: Video loaded successfully")
+            logger.info(f"Video loaded successfully: {video_path}")
             return True
 
         except Exception as e:
-            print(f"VLC Player: Failed to load video: {e}")
+            logger.error(f"Failed to load video: {e}", exc_info=True)
             return False
 
     def play_pause(self):
@@ -319,9 +321,9 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
             ms = self.timestamp_to_milliseconds(timestamp)
             # Set player time in milliseconds
             self.player.set_time(ms)
-            print(f"VLC Player: Seeked to {timestamp} ({ms}ms)")
+            logger.debug(f"Seeked to {timestamp} ({ms}ms)")
         except Exception as e:
-            print(f"VLC Player: Failed to seek to {timestamp}: {e}")
+            logger.error(f"Failed to seek to {timestamp}: {e}")
 
     def slider_pressed(self):
         """Called when user starts dragging slider."""

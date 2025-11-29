@@ -5,6 +5,10 @@ Creates VLC media player instance.
 
 from typing import Optional
 from .media_player_interface import MediaPlayerInterface
+import logging
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 class MediaPlayerFactory:
@@ -28,16 +32,14 @@ class MediaPlayerFactory:
         try:
             from .vlc_media_player import VLCMediaPlayerWidget
             player = VLCMediaPlayerWidget(parent)
-            print(f"Using {player.get_player_name()}")
+            logger.info(f"Using {player.get_player_name()}")
             return player
         except ImportError as e:
-            print(f"Could not load VLC player: {e}")
+            logger.error(f"Could not load VLC player: {e}")
         except Exception as e:
-            print(f"Error creating VLC player: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"Error creating VLC player: {e}", exc_info=True)
 
-        print("Warning: VLC player not available")
+        logger.warning("VLC player not available")
         return None
 
     @staticmethod

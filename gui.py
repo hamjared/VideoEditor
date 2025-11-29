@@ -5,6 +5,7 @@ Provides a graphical interface for the video editor functionality
 
 import sys
 import os
+import logging
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QLineEdit, QTableWidget, QTableWidgetItem,
@@ -13,6 +14,10 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from video_editor import VideoEditor
 from video_player.media_player_factory import MediaPlayerFactory
+from log_viewer import LogViewerDialog
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
 
 
 class ExportWorker(QThread):
@@ -59,6 +64,9 @@ class VideoEditorGUI(QMainWindow):
         self.setWindowTitle('Simple Video Editor')
         self.setGeometry(100, 100, 1200, 800)
 
+        # Create menu bar
+        self.create_menu_bar()
+
         # Create central widget and main layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -100,6 +108,48 @@ class VideoEditorGUI(QMainWindow):
 
         # Status bar
         self.statusBar().showMessage('Ready')
+
+    def create_menu_bar(self):
+        """Create the application menu bar."""
+        menubar = self.menuBar()
+
+        # View menu
+        view_menu = menubar.addMenu('&View')
+
+        # Show Logs action
+        show_logs_action = view_menu.addAction('Show &Logs')
+        show_logs_action.triggered.connect(self.show_logs)
+        show_logs_action.setStatusTip('View application logs')
+
+        # Help menu
+        help_menu = menubar.addMenu('&Help')
+
+        # About action
+        about_action = help_menu.addAction('&About')
+        about_action.triggered.connect(self.show_about)
+        about_action.setStatusTip('About this application')
+
+    def show_logs(self):
+        """Show the log viewer dialog."""
+        logger.info("Opening log viewer")
+        log_dialog = LogViewerDialog(self)
+        log_dialog.exec_()
+
+    def show_about(self):
+        """Show the about dialog."""
+        QMessageBox.about(
+            self,
+            'About Simple Video Editor',
+            '<h3>Simple Video Editor</h3>'
+            '<p>A PyQt5-based video editor for cutting clips from videos.</p>'
+            '<p>Features:</p>'
+            '<ul>'
+            '<li>VLC-powered video player with audio support</li>'
+            '<li>Frame-accurate clip marking</li>'
+            '<li>Batch export to MP4</li>'
+            '<li>Import clip definitions from CSV/Excel</li>'
+            '</ul>'
+        )
 
     def create_file_section(self):
         """Create the file loading section."""
