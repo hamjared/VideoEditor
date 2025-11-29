@@ -9,6 +9,36 @@ from typing import Dict, List, Tuple
 import re
 import pandas as pd
 from proglog import ProgressBarLogger
+import logging
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
+
+
+class SilentLogger(ProgressBarLogger):
+    """
+    Silent logger for MoviePy that suppresses all output.
+    This prevents stdout access issues in frozen executables.
+    """
+    def __init__(self):
+        # Don't call super().__init__() to avoid any stdout initialization
+        self.bars = {}
+
+    def bars_callback(self, bar, attr, value, old_value=None):
+        """Suppress progress bar updates."""
+        pass
+
+    def callback(self, **changes):
+        """Suppress all callbacks."""
+        pass
+
+    def iter_bar(self, *args, **kwargs):
+        """Suppress iter_bar."""
+        pass
+
+    def log(self, message):
+        """Suppress log messages."""
+        pass
 
 
 class VideoEditor:
@@ -373,20 +403,30 @@ class VideoEditor:
 
         start, end = self.clips[clip_name]
 
-        # Extract subclip (MoviePy v2.0 uses subclipped method)
-        subclip = self.video_clip.subclipped(start, end)
+        logger.info(f"Exporting clip '{clip_name}' to {output_path}")
 
-        # Export with re-encoding
-        subclip.write_videofile(
-            output_path,
-            codec=codec,
-            audio_codec=audio_codec,
-            temp_audiofile='temp-audio.m4a',
-            remove_temp=True
-        )
+        try:
+            # Extract subclip (MoviePy v2.0 uses subclipped method)
+            subclip = self.video_clip.subclipped(start, end)
 
-        # Close the subclip
-        subclip.close()
+            # Export with re-encoding using SilentLogger
+            subclip.write_videofile(
+                output_path,
+                codec=codec,
+                audio_codec=audio_codec,
+                temp_audiofile='temp-audio.m4a',
+                remove_temp=True,
+                logger=SilentLogger()
+            )
+
+            # Close the subclip
+            subclip.close()
+
+            logger.info(f"Successfully exported '{clip_name}'")
+
+        except Exception as e:
+            logger.error(f"Failed to export clip '{clip_name}': {e}", exc_info=True)
+            raise
 
     def export_all_clips(self, output_dir: str,
                         codec: str = 'libx264',
@@ -428,35 +468,28 @@ class VideoEditor:
             output_filename = f"{clip_name}.mp4"
             output_path = os.path.join(output_dir, output_filename)
 
-            # Extract and export subclip (MoviePy v2.0 uses subclipped method)
-            subclip = self.video_clip.subclipped(start, end)
+            logger.info(f"Exporting clip {idx}/{total_clips}: '{clip_name}' to {output_path}")
 
-            # Create a silent logger to suppress MoviePy progress output
-            class SilentLogger(ProgressBarLogger):
-                def __init__(self):
-                    super().__init__()
-                    # Set print_messages to False to prevent stdout access
-                    self.print_messages = False
+            try:
+                # Extract and export subclip (MoviePy v2.0 uses subclipped method)
+                subclip = self.video_clip.subclipped(start, end)
 
-                def bars_callback(self, bar, attr, value, old_value=None):
-                    # Suppress progress bar updates
-                    pass
+                subclip.write_videofile(
+                    output_path,
+                    codec=codec,
+                    audio_codec=audio_codec,
+                    temp_audiofile=f'temp-audio-{clip_name}.m4a',
+                    remove_temp=True,
+                    logger=SilentLogger()
+                )
+                subclip.close()
 
-                def callback(self, **changes):
-                    # Suppress all callbacks
-                    pass
+                exported_files.append(output_path)
+                logger.info(f"Successfully exported '{clip_name}'")
 
-            subclip.write_videofile(
-                output_path,
-                codec=codec,
-                audio_codec=audio_codec,
-                temp_audiofile=f'temp-audio-{clip_name}.m4a',
-                remove_temp=True,
-                logger=SilentLogger()
-            )
-            subclip.close()
-
-            exported_files.append(output_path)
+            except Exception as e:
+                logger.error(f"Failed to export clip '{clip_name}': {e}", exc_info=True)
+                raise
 
         # Final progress callback
         if progress_callback:
