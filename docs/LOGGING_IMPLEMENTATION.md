@@ -66,6 +66,7 @@ except Exception as e:
 - `gui.py` - Added menu bar and log viewer integration
 - `video_player/vlc_media_player.py` - Replaced print statements
 - `video_player/media_player_factory.py` - Replaced print statements
+- `video_editor.py` - Added MoviePyLogger to redirect MoviePy output to logs
 
 ### Log Levels
 
@@ -181,6 +182,40 @@ Example from gui.py:
 ```python
 logger.info(f"Video loaded successfully: {video_path}")
 self.statusBar().showMessage(f"Video loaded: {filename}")
+```
+
+### 5. MoviePy Integration
+
+MoviePy output is redirected to the logging system via `MoviePyLogger`:
+- Prevents stdout access issues in frozen executables
+- MoviePy messages logged to 'moviepy' logger namespace
+- Progress updates logged at DEBUG level (every 10%)
+- Export operations fully visible in logs
+
+Example from video_editor.py:
+```python
+class MoviePyLogger(ProgressBarLogger):
+    """Redirects MoviePy output to Python logging."""
+    def __init__(self):
+        self.bars = {}
+        self.logger = logging.getLogger('moviepy')
+
+    def log(self, message):
+        """Log MoviePy messages."""
+        if message:
+            self.logger.info(str(message).strip())
+
+# Used in export
+subclip.write_videofile(
+    output_path,
+    logger=MoviePyLogger()
+)
+```
+
+To see MoviePy progress details, enable DEBUG logging:
+```python
+from logging_config import set_module_log_level
+set_module_log_level('moviepy', logging.DEBUG)
 ```
 
 ## Best Practices

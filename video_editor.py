@@ -15,30 +15,42 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class SilentLogger(ProgressBarLogger):
+class MoviePyLogger(ProgressBarLogger):
     """
-    Silent logger for MoviePy that suppresses all output.
-    This prevents stdout access issues in frozen executables.
+    Custom logger for MoviePy that redirects output to Python logging.
+    This prevents stdout access issues in frozen executables while
+    maintaining visibility into the export process.
     """
     def __init__(self):
         # Don't call super().__init__() to avoid any stdout initialization
         self.bars = {}
+        self.logger = logging.getLogger('moviepy')
 
     def bars_callback(self, bar, attr, value, old_value=None):
-        """Suppress progress bar updates."""
-        pass
+        """Log progress bar updates at DEBUG level."""
+        # Only log significant progress to avoid spam
+        if attr == 'index' and value is not None and old_value is not None:
+            # Log every 10% progress
+            percentage = int((value / self.bars[bar]['total']) * 100) if self.bars.get(bar, {}).get('total') else 0
+            old_percentage = int((old_value / self.bars[bar]['total']) * 100) if old_value and self.bars.get(bar, {}).get('total') else 0
+            if percentage // 10 != old_percentage // 10:
+                self.logger.debug(f"Progress: {percentage}%")
 
     def callback(self, **changes):
-        """Suppress all callbacks."""
+        """Log callback messages."""
         pass
 
     def iter_bar(self, *args, **kwargs):
-        """Suppress iter_bar."""
+        """Suppress iter_bar to avoid stdout."""
         pass
 
     def log(self, message):
-        """Suppress log messages."""
-        pass
+        """Log MoviePy messages to our logging system."""
+        if message:
+            # Parse message level if MoviePy includes it
+            message_str = str(message).strip()
+            if message_str:
+                self.logger.info(message_str)
 
 
 class VideoEditor:
@@ -409,14 +421,14 @@ class VideoEditor:
             # Extract subclip (MoviePy v2.0 uses subclipped method)
             subclip = self.video_clip.subclipped(start, end)
 
-            # Export with re-encoding using SilentLogger
+            # Export with re-encoding using MoviePyLogger
             subclip.write_videofile(
                 output_path,
                 codec=codec,
                 audio_codec=audio_codec,
                 temp_audiofile='temp-audio.m4a',
                 remove_temp=True,
-                logger=SilentLogger()
+                logger=MoviePyLogger()
             )
 
             # Close the subclip
@@ -480,7 +492,7 @@ class VideoEditor:
                     audio_codec=audio_codec,
                     temp_audiofile=f'temp-audio-{clip_name}.m4a',
                     remove_temp=True,
-                    logger=SilentLogger()
+                    logger=MoviePyLogger()
                 )
                 subclip.close()
 
