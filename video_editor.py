@@ -28,11 +28,25 @@ class MoviePyLogger:
         self.stored = {}
         self.logs = []
         self.log_indent = 0
-        self.ignored_bars = None
+        self.ignored_bars = set() if True else None  # Empty set instead of None
         self.logged_bars = 'all'
         self.min_time_interval = 0
         self.ignore_bars_under = 0
         self.logger = logging.getLogger('moviepy')
+
+    def bar_is_ignored(self, bar):
+        """Check if a bar should be ignored."""
+        if self.ignored_bars is None:
+            return False
+        return bar in self.ignored_bars
+
+    def bar_is_logged(self, bar):
+        """Check if a bar should be logged."""
+        if self.logged_bars == 'all':
+            return True
+        if self.logged_bars is None:
+            return False
+        return bar in self.logged_bars
 
     def bars_callback(self, bar, attr, value, old_value=None):
         """Log progress bar updates at DEBUG level."""
@@ -50,9 +64,31 @@ class MoviePyLogger:
         """Log callback messages."""
         pass
 
+    def store(self, **changes):
+        """Store state changes."""
+        self.stored.update(changes)
+
+    def store_callback(self, **changes):
+        """Store callback - compatibility method."""
+        pass
+
     def iter_bar(self, *args, **kwargs):
         """Suppress iter_bar to avoid stdout."""
-        pass
+        # Return empty iterator instead of None
+        return iter([])
+
+    def iter(self, *args, **kwargs):
+        """Iter method - compatibility."""
+        # Return empty iterator instead of None
+        return iter([])
+
+    def iterable_is_too_short(self, *args, **kwargs):
+        """Check if iterable is too short."""
+        return False
+
+    def dump_logs(self):
+        """Dump logs - compatibility method."""
+        return self.logs
 
     def log(self, message):
         """Log MoviePy messages to our logging system."""
@@ -60,6 +96,7 @@ class MoviePyLogger:
             message_str = str(message).strip()
             if message_str:
                 self.logger.info(message_str)
+                self.logs.append(message_str)
 
     def __call__(self, **changes):
         """Handle direct calls (MoviePy compatibility)."""
