@@ -1,9 +1,14 @@
-# MoviePy v2.0+ (uses new API: subclipped instead of subclip)
-moviepy>=2.0.0
+# Core dependencies
 PyQt5>=5.15.0
 numpy>=1.19.0
 pyinstaller>=5.0.0
 
-# For CSV/Excel import functionality
+# Video processing
+moviepy>=2.0.0              # For video export/cutting
+
+# Video player
+python-vlc>=3.0.0           # VLC player for video preview with audio
+
+# CSV/Excel import functionality
 pandas>=1.3.0
 openpyxl>=3.0.0

@@ -5,38 +5,46 @@ A Python-based video editor with a PyQt5 GUI for cutting multiple clips from vid
 ## Features
 
 - Load video files (MP4, AVI, MKV, MOV, WMV, FLV)
+- Video preview with audio playback using VLC player
+- Playback speed controls (0.25x to 16x)
+- Mark start/end times during playback
 - Define multiple clips using timestamp format (HH:MM:SS.mmm)
-- Preview clip information before exporting
+- Import clips from CSV/Excel files
 - Export all clips at once with progress tracking
 - Re-encode clips for maximum compatibility
 
 ## Installation
 
-1. Install dependencies:
+### 1. Install Python dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-**Important Notes:**
-- This project uses **MoviePy v2.0+** with the latest API
-- MoviePy requires ffmpeg to be installed on your system
-- Python 3.7+ is required
-
-### Installing FFmpeg:
+### 2. Install VLC (required for video preview):
 
 **Windows:**
-- Download from https://ffmpeg.org/download.html
-- Add ffmpeg to your PATH
+- VLC is bundled with the application - no additional installation needed!
 
-**Mac:**
+**Linux (Ubuntu/Debian):**
 ```bash
-brew install ffmpeg
+sudo apt-get install vlc libvlc-dev python3-vlc
 ```
 
-**Linux:**
+**Linux (Fedora/RHEL):**
 ```bash
-sudo apt-get install ffmpeg
+sudo dnf install vlc vlc-devel python-vlc
 ```
+
+**macOS:**
+```bash
+brew install --cask vlc
+```
+
+**Important Notes:**
+- This project uses **MoviePy v2.0+** with the latest API
+- FFmpeg is bundled with the application (Windows) or can be installed via package manager
+- Python 3.7+ is required
+- VLC is bundled on Windows, but must be installed system-wide on Linux/macOS
 
 ## Usage
 
