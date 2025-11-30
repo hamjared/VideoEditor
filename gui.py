@@ -876,13 +876,6 @@ class VideoEditorGUI(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close event."""
-        # Clean up video player if available
-        if self.video_player:
-            self.video_player.close_player()
-
-        # Clean up video editor
-        self.editor.close()
-
         # Wait for export worker to finish if running
         if self.export_worker and self.export_worker.isRunning():
             reply = QMessageBox.question(
@@ -892,18 +885,44 @@ class VideoEditorGUI(QMainWindow):
                 QMessageBox.Yes | QMessageBox.No
             )
 
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.No:
+                event.ignore()
+                return
+            else:
                 self.export_worker.terminate()
                 self.export_worker.wait()
-                # Clear recovery on normal exit
-                self.persistence_manager.clear_recovery()
-                event.accept()
-            else:
+
+        # Ask if user wants to save session for next time
+        if self.editor.clips or self.editor.video_path or self.output_dir:
+            reply = QMessageBox.question(
+                self,
+                "Save Session?",
+                "Do you want to save your current session?\n\n"
+                "You can restore it the next time you open the app.",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+                QMessageBox.Yes
+            )
+
+            if reply == QMessageBox.Cancel:
                 event.ignore()
+                return
+            elif reply == QMessageBox.No:
+                # User chose not to save - clear recovery
+                self.persistence_manager.clear_recovery()
+            # If Yes, recovery file is already saved (from auto-save), so just exit
+
         else:
-            # Clear recovery on normal exit
+            # Nothing to save, clear recovery
             self.persistence_manager.clear_recovery()
-            event.accept()
+
+        # Clean up video player if available
+        if self.video_player:
+            self.video_player.close_player()
+
+        # Clean up video editor
+        self.editor.close()
+
+        event.accept()
 
     # Persistence methods
 
