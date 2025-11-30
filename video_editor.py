@@ -471,14 +471,15 @@ class VideoEditor:
             # Extract subclip (MoviePy v2.0 uses subclipped method)
             subclip = self.video_clip.subclipped(start, end)
 
-            # Export with re-encoding using MoviePyLogger
+            # Export with re-encoding
+            # Use logger=None to disable MoviePy's progress bars (avoids stdout issues)
             subclip.write_videofile(
                 output_path,
                 codec=codec,
                 audio_codec=audio_codec,
                 temp_audiofile='temp-audio.m4a',
                 remove_temp=True,
-                logger=MoviePyLogger()
+                logger=None
             )
 
             # Close the subclip
@@ -536,13 +537,14 @@ class VideoEditor:
                 # Extract and export subclip (MoviePy v2.0 uses subclipped method)
                 subclip = self.video_clip.subclipped(start, end)
 
+                # Use logger=None to disable MoviePy's progress bars (avoids stdout issues)
                 subclip.write_videofile(
                     output_path,
                     codec=codec,
                     audio_codec=audio_codec,
                     temp_audiofile=f'temp-audio-{clip_name}.m4a',
                     remove_temp=True,
-                    logger=MoviePyLogger()
+                    logger=None
                 )
                 subclip.close()
 
