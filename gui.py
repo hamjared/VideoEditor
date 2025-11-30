@@ -16,6 +16,8 @@ from video_editor import VideoEditor
 from video_player.media_player_factory import MediaPlayerFactory
 from log_viewer import LogViewerDialog
 from timestamp_editor import TimestampDelegate, TimestampEditor
+from clip_persistence import ClipPersistenceManager
+from persistence_ui import PersistenceUI, RecoveryAction
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -58,7 +60,19 @@ class VideoEditorGUI(QMainWindow):
         self.output_dir = None
         self.export_worker = None
         self.updating_table = False  # Flag to prevent recursive updates
+
+        # Set up persistence
+        recovery_dir = os.path.join(os.path.expanduser("~"), ".videoeditor")
+        os.makedirs(recovery_dir, exist_ok=True)
+        recovery_file = os.path.join(recovery_dir, "recovery.vedclips")
+
+        self.persistence_manager = ClipPersistenceManager(recovery_file)
+        self.persistence_ui = PersistenceUI(self, self.persistence_manager)
+
         self.init_ui()
+
+        # Check for recovery after UI is initialized
+        self.check_recovery()
 
     def init_ui(self):
         """Initialize the user interface."""
@@ -113,6 +127,23 @@ class VideoEditorGUI(QMainWindow):
     def create_menu_bar(self):
         """Create the application menu bar."""
         menubar = self.menuBar()
+
+        # File menu
+        file_menu = menubar.addMenu('&File')
+
+        # Save Clips action
+        save_clips_action = file_menu.addAction('&Save Clips As...')
+        save_clips_action.triggered.connect(self.save_clips_as)
+        save_clips_action.setShortcut('Ctrl+S')
+        save_clips_action.setStatusTip('Save clips to file')
+
+        # Load Clips action
+        load_clips_action = file_menu.addAction('&Load Clips...')
+        load_clips_action.triggered.connect(self.load_clips_from_file)
+        load_clips_action.setShortcut('Ctrl+O')
+        load_clips_action.setStatusTip('Load clips from file')
+
+        file_menu.addSeparator()
 
         # View menu
         view_menu = menubar.addMenu('&View')
@@ -519,6 +550,7 @@ class VideoEditorGUI(QMainWindow):
                 self.start_time_input.clear()
                 self.end_time_input.clear()
 
+                self.auto_save()  # Auto-save after auto-creating clip
                 self.statusBar().showMessage(f"Clip '{filler_name}' created. Edit name in table if needed.")
             except Exception as e:
                 self.statusBar().showMessage(f"Failed to create clip: {e}")
@@ -548,6 +580,7 @@ class VideoEditorGUI(QMainWindow):
             self.duration_input.clear()
             self.end_time_input.clear()
 
+            self.auto_save()  # Auto-save after adding clip
             self.statusBar().showMessage(f"Clip '{clip_name}' added successfully")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to add clip:\n{str(e)}")
@@ -598,6 +631,8 @@ class VideoEditorGUI(QMainWindow):
 
             # Refresh to update duration and format timestamps
             self.refresh_clips_table()
+
+            self.auto_save()  # Auto-save after editing clip
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to update clip:\n{str(e)}")
@@ -667,6 +702,7 @@ class VideoEditorGUI(QMainWindow):
                 )
 
             self.refresh_clips_table()
+            self.auto_save()  # Auto-save after importing clips
             self.statusBar().showMessage(
                 f"Imported {stats['success']} clips ({stats['failed']} failed)"
             )
@@ -735,6 +771,7 @@ class VideoEditorGUI(QMainWindow):
         try:
             self.editor.remove_clip(clip_name)
             self.refresh_clips_table()
+            self.auto_save()  # Auto-save after removing clip
             self.statusBar().showMessage(f"Clip '{clip_name}' removed")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to remove clip:\n{str(e)}")
@@ -754,6 +791,7 @@ class VideoEditorGUI(QMainWindow):
         if reply == QMessageBox.Yes:
             self.editor.clear_clips()
             self.refresh_clips_table()
+            self.auto_save()  # Auto-save after clearing clips
             self.statusBar().showMessage("All clips cleared")
 
     def choose_output_dir(self):
@@ -768,6 +806,7 @@ class VideoEditorGUI(QMainWindow):
             self.output_dir = directory
             self.output_dir_label.setText(f"Output: {directory}")
             self.update_export_button()
+            self.auto_save()  # Auto-save after changing output directory
             self.statusBar().showMessage(f"Output directory: {directory}")
 
     def update_export_button(self):
@@ -856,11 +895,135 @@ class VideoEditorGUI(QMainWindow):
             if reply == QMessageBox.Yes:
                 self.export_worker.terminate()
                 self.export_worker.wait()
+                # Clear recovery on normal exit
+                self.persistence_manager.clear_recovery()
                 event.accept()
             else:
                 event.ignore()
         else:
+            # Clear recovery on normal exit
+            self.persistence_manager.clear_recovery()
             event.accept()
+
+    # Persistence methods
+
+    def check_recovery(self):
+        """Check for recovery file on startup."""
+        if self.persistence_manager.has_recovery():
+            recovery_data = self.persistence_manager.load_recovery()
+            if recovery_data:
+                action = self.persistence_ui.show_recovery_dialog(recovery_data)
+
+                if action == RecoveryAction.LOAD:
+                    self.restore_from_recovery(recovery_data)
+                elif action == RecoveryAction.DISCARD:
+                    self.persistence_manager.clear_recovery()
+                # CANCEL = do nothing, keep recovery file
+
+    def restore_from_recovery(self, recovery_data):
+        """Restore session from recovery data."""
+        video_path = recovery_data.get('video_path')
+
+        # Check if video exists
+        if video_path and not os.path.exists(video_path):
+            if not self.persistence_ui.show_missing_video_dialog(video_path):
+                return  # User chose not to load
+
+        # Load video if exists
+        if video_path and os.path.exists(video_path):
+            try:
+                self.editor.load_video(video_path)
+                self.file_label.setText(f"Loaded: {os.path.basename(video_path)}")
+                self.update_video_info()
+
+                # Load into video player if available
+                if self.video_player:
+                    self.video_player.load_video(video_path)
+
+            except Exception as e:
+                logger.warning(f"Failed to load video from recovery: {e}")
+                # Continue loading clips anyway
+
+        # Load output directory
+        if recovery_data.get('output_directory'):
+            self.output_dir = recovery_data['output_directory']
+            self.output_dir_label.setText(f"Output: {self.output_dir}")
+
+        # Load clips
+        for clip in recovery_data.get('clips', []):
+            try:
+                self.editor.add_clip(clip['name'], clip['start'], clip['end'])
+            except Exception as e:
+                logger.warning(f"Failed to restore clip {clip.get('name')}: {e}")
+                # Skip invalid clips
+
+        self.refresh_clips_table()
+        self.update_export_button()
+        self.statusBar().showMessage("Session restored")
+
+    def auto_save(self):
+        """Auto-save current state to recovery file."""
+        try:
+            video_path = self.editor.video_path if self.editor.video_clip else None
+            clips = self.editor.get_clips_info()
+            self.persistence_manager.save_recovery(clips, video_path, self.output_dir)
+        except Exception as e:
+            logger.error(f"Auto-save failed: {e}", exc_info=True)
+
+    def save_clips_as(self):
+        """Manual save - File menu action."""
+        if not self.editor.clips:
+            QMessageBox.warning(self, "Warning", "No clips to save")
+            return
+
+        # Get default location
+        if self.editor.video_path:
+            default_dir = os.path.dirname(self.editor.video_path)
+            video_name = os.path.splitext(os.path.basename(self.editor.video_path))[0]
+            default_name = f"{video_name}_clips.vedclips"
+        else:
+            default_dir = os.path.expanduser("~")
+            default_name = "clips.vedclips"
+
+        # Prompt for location
+        file_path = self.persistence_ui.prompt_save_location(default_dir, default_name)
+
+        if file_path:
+            video_path = self.editor.video_path if self.editor.video_clip else None
+            clips = self.editor.get_clips_info()
+
+            if self.persistence_manager.save_to_file(file_path, clips, video_path, self.output_dir):
+                self.persistence_ui.show_save_success(file_path)
+                self.statusBar().showMessage(f"Clips saved to {os.path.basename(file_path)}")
+            else:
+                self.persistence_ui.show_save_error("Failed to save file")
+
+    def load_clips_from_file(self):
+        """Manual load - File menu action."""
+        file_path = self.persistence_ui.prompt_load_location()
+
+        if file_path:
+            try:
+                data = self.persistence_manager.load_from_file(file_path)
+
+                if not data:
+                    self.persistence_ui.show_load_error("Invalid or corrupted file")
+                    return
+
+                # Check video mismatch
+                if data.get('video_path') and self.editor.video_path:
+                    if data['video_path'] != self.editor.video_path:
+                        if not self.persistence_ui.show_video_mismatch_dialog(
+                            data['video_path'], self.editor.video_path
+                        ):
+                            return
+
+                self.restore_from_recovery(data)  # Reuse the same logic
+                self.statusBar().showMessage(f"Clips loaded from {os.path.basename(file_path)}")
+
+            except Exception as e:
+                logger.error(f"Failed to load clips: {e}", exc_info=True)
+                self.persistence_ui.show_load_error(str(e))
 
 
 def main():
