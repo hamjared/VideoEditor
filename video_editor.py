@@ -548,40 +548,51 @@ class VideoEditor:
 
         exported_files = []
         total_clips = len(self.clips)
+        subclips = []  # Keep track of subclips to close them all at the end
 
-        for idx, (clip_name, (start, end)) in enumerate(self.clips.items(), 1):
-            # Call progress callback if provided
-            if progress_callback:
-                progress_callback(idx - 1, total_clips, clip_name)
-
-            # Generate output filename
-            output_filename = f"{clip_name}.mp4"
-            output_path = os.path.join(output_dir, output_filename)
-
-            logger.info(f"Exporting clip {idx}/{total_clips}: '{clip_name}' to {output_path}")
-
+        # Wrap entire export loop in SuppressStdout to avoid MoviePy audio reader issues
+        with SuppressStdout():
             try:
-                # Extract and export subclip (MoviePy v2.0 uses subclipped method)
-                subclip = self.video_clip.subclipped(start, end)
+                for idx, (clip_name, (start, end)) in enumerate(self.clips.items(), 1):
+                    # Call progress callback if provided
+                    if progress_callback:
+                        progress_callback(idx - 1, total_clips, clip_name)
 
-                # Export with stdout/stderr suppression for frozen executable compatibility
-                with SuppressStdout():
-                    subclip.write_videofile(
-                        output_path,
-                        codec=codec,
-                        audio_codec=audio_codec,
-                        temp_audiofile=f'temp-audio-{clip_name}.m4a',
-                        remove_temp=True,
-                        logger=None
-                    )
-                subclip.close()
+                    # Generate output filename
+                    output_filename = f"{clip_name}.mp4"
+                    output_path = os.path.join(output_dir, output_filename)
 
-                exported_files.append(output_path)
-                logger.info(f"Successfully exported '{clip_name}'")
+                    logger.info(f"Exporting clip {idx}/{total_clips}: '{clip_name}' to {output_path}")
 
-            except Exception as e:
-                logger.error(f"Failed to export clip '{clip_name}': {e}", exc_info=True)
-                raise
+                    try:
+                        # Extract subclip (MoviePy v2.0 uses subclipped method)
+                        subclip = self.video_clip.subclipped(start, end)
+                        subclips.append(subclip)  # Store for cleanup later
+
+                        # Export the subclip
+                        subclip.write_videofile(
+                            output_path,
+                            codec=codec,
+                            audio_codec=audio_codec,
+                            temp_audiofile=f'temp-audio-{clip_name}.m4a',
+                            remove_temp=True,
+                            logger=None
+                        )
+
+                        exported_files.append(output_path)
+                        logger.info(f"Successfully exported '{clip_name}'")
+
+                    except Exception as e:
+                        logger.error(f"Failed to export clip '{clip_name}': {e}", exc_info=True)
+                        raise
+
+            finally:
+                # Close all subclips at the end to avoid corrupting shared audio readers
+                for subclip in subclips:
+                    try:
+                        subclip.close()
+                    except:
+                        pass  # Ignore errors during cleanup
 
         # Final progress callback
         if progress_callback:
