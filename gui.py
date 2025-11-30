@@ -15,6 +15,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from video_editor import VideoEditor
 from video_player.media_player_factory import MediaPlayerFactory
 from log_viewer import LogViewerDialog
+from timestamp_editor import TimestampDelegate, TimestampEditor
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
@@ -229,7 +230,7 @@ class VideoEditorGUI(QMainWindow):
 
         # Start time input
         manual_layout.addWidget(QLabel("Start:"))
-        self.start_time_input = QLineEdit()
+        self.start_time_input = TimestampEditor()
         self.start_time_input.setPlaceholderText("00:00:00.000")
         self.start_time_input.setFixedWidth(120)
         manual_layout.addWidget(self.start_time_input)
@@ -244,7 +245,7 @@ class VideoEditorGUI(QMainWindow):
 
         # End time input
         manual_layout.addWidget(QLabel("End:"))
-        self.end_time_input = QLineEdit()
+        self.end_time_input = TimestampEditor()
         self.end_time_input.setPlaceholderText("00:00:00.000")
         self.end_time_input.setFixedWidth(120)
         self.end_time_input.textChanged.connect(self.on_end_time_changed)
@@ -291,6 +292,11 @@ class VideoEditorGUI(QMainWindow):
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+
+        # Set custom delegate for timestamp columns (Start and End)
+        timestamp_delegate = TimestampDelegate()
+        self.clips_table.setItemDelegateForColumn(1, timestamp_delegate)  # Start column
+        self.clips_table.setItemDelegateForColumn(2, timestamp_delegate)  # End column
 
         self.clips_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.clips_table.setEditTriggers(QTableWidget.DoubleClicked)
