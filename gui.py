@@ -181,6 +181,10 @@ class VideoEditorGUI(QMainWindow):
             '<li>Batch export to MP4</li>'
             '<li>Import clip definitions from CSV/Excel</li>'
             '</ul>'
+            '<hr>'
+            '<p style="font-size: 9pt;">Icon: Movie by Andre Buand from '
+            '<a href="https://thenounproject.com/browse/icons/term/movie/" '
+            'target="_blank" title="Movie Icons">Noun Project</a> (CC BY 3.0)</p>'
         )
 
     def create_file_section(self):
