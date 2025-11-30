@@ -82,12 +82,25 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# Create splash screen object
+splash = Splash(
+    'splash.png',
+    binaries=a.binaries,
+    datas=a.datas,
+    text_pos=(200, 170),  # Position for "Loading..." text (x, y from top-left)
+    text_size=10,
+    text_color='white',
+    text_default='Loading...',
+)
+
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
     a.zipfiles,
     a.datas,
+    splash,  # Add splash to exe
+    splash.binaries,  # Add splash binaries
     [],
     name='VideoEditor',
     debug=False,

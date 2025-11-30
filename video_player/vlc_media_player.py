@@ -4,7 +4,7 @@ Uses VLC for video playback with full audio support.
 """
 
 from PyQt5.QtWidgets import (
-    QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider, QStyle, QComboBox, QFrame
+    QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider, QStyle, QComboBox, QFrame, QSizePolicy
 )
 from PyQt5.QtCore import Qt, QTimer
 from .media_player_interface import MediaPlayerInterface
@@ -131,7 +131,8 @@ class VLCMediaPlayerWidget(MediaPlayerInterface):
         self.video_frame = QFrame()
         self.video_frame.setMinimumSize(640, 360)
         self.video_frame.setStyleSheet("background-color: black;")
-        layout.addWidget(self.video_frame)
+        self.video_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        layout.addWidget(self.video_frame, 1)
 
         # Attach VLC to the frame
         if self.player and sys.platform.startswith('win'):

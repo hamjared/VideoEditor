@@ -88,11 +88,42 @@ def setup_media_libs():
         else:
             logger.warning(f"Bundled VLC not found at {vlc_dir}, will use system VLC")
 
-# Set up media libraries BEFORE importing gui
-setup_media_libs()
-
-logger.info("Importing GUI module")
-from gui import main
-
 if __name__ == '__main__':
-    main()
+    from PyQt5.QtWidgets import QApplication
+
+    # Close PyInstaller splash screen if it exists
+    try:
+        import pyi_splash
+        pyi_splash.close()
+    except ImportError:
+        pass  # Not running as frozen executable
+
+    # Create QApplication first (needed for splash screen)
+    app = QApplication(sys.argv)
+
+    # Create and show splash screen
+    from splash_screen import SplashScreen
+    splash = SplashScreen()
+    splash.show()
+    splash.set_progress(10, "Initializing...")
+
+    # Setup media libraries with progress updates
+    splash.set_progress(30, "Setting up media libraries...")
+    setup_media_libs()
+
+    # Import GUI module
+    splash.set_progress(60, "Loading video player...")
+    logger.info("Importing GUI module")
+    from gui import VideoEditorGUI
+
+    # Create main window
+    splash.set_progress(80, "Initializing interface...")
+    window = VideoEditorGUI()
+
+    # Show main window and close splash
+    splash.set_progress(100, "Ready!")
+    window.show()
+    splash.close()
+
+    # Start application
+    sys.exit(app.exec_())

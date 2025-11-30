@@ -77,15 +77,15 @@ class VideoEditorGUI(QMainWindow):
 
         # File section
         file_group = self.create_file_section()
-        left_layout.addWidget(file_group)
+        left_layout.addWidget(file_group, 0)
 
-        # Video player section
+        # Video player section (takes most space)
         player_group = self.create_player_section()
-        left_layout.addWidget(player_group)
+        left_layout.addWidget(player_group, 3)
 
-        # Video info section
+        # Video info section (minimal space)
         info_group = self.create_info_section()
-        left_layout.addWidget(info_group)
+        left_layout.addWidget(info_group, 0)
 
         main_layout.addLayout(left_layout, 1)
 
@@ -167,6 +167,7 @@ class VideoEditorGUI(QMainWindow):
         layout.addWidget(load_btn)
 
         group.setLayout(layout)
+        group.setFixedHeight(100)
         return group
 
     def create_player_section(self):
@@ -181,7 +182,7 @@ class VideoEditorGUI(QMainWindow):
             # Connect mark buttons to populate input fields
             self.video_player.mark_start_clicked.connect(self.on_mark_start)
             self.video_player.mark_end_clicked.connect(self.on_mark_end)
-            layout.addWidget(self.video_player)
+            layout.addWidget(self.video_player, 1)  # Stretch factor of 1 to expand
         else:
             # No player available
             no_player_label = QLabel(
@@ -191,7 +192,7 @@ class VideoEditorGUI(QMainWindow):
             )
             no_player_label.setStyleSheet("padding: 20px; color: #888;")
             no_player_label.setAlignment(Qt.AlignCenter)
-            layout.addWidget(no_player_label)
+            layout.addWidget(no_player_label, 1)  # Stretch factor of 1 to expand
 
         group.setLayout(layout)
         return group
@@ -208,6 +209,7 @@ class VideoEditorGUI(QMainWindow):
         layout.addWidget(self.info_label)
 
         group.setLayout(layout)
+        group.setMaximumHeight(120)
         return group
 
     def create_add_clip_section(self):
