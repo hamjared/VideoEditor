@@ -432,7 +432,7 @@ class VideoEditor:
         Get information about all defined clips.
 
         Returns:
-            List of dictionaries containing clip information
+            List of dictionaries containing clip information, sorted by start time
         """
         clips_info = []
         for name, (start, end) in self.clips.items():
@@ -444,6 +444,8 @@ class VideoEditor:
                 'end_seconds': end,
                 'duration': end - start
             })
+        # Sort by start time
+        clips_info.sort(key=lambda x: x['start_seconds'])
         return clips_info
 
     def get_video_info(self) -> Dict:
