@@ -5,14 +5,41 @@ Handles video loading, clip management, and export operations using MoviePy
 
 from moviepy import VideoFileClip
 import os
+import sys
 from typing import Dict, List, Tuple
 import re
 import pandas as pd
 from proglog import ProgressBarLogger
 import logging
+from io import StringIO
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
+
+
+class SuppressStdout:
+    """
+    Context manager to suppress stdout/stderr during MoviePy operations.
+    This prevents crashes in frozen executables where stdout is None.
+    """
+    def __enter__(self):
+        # Save original stdout/stderr
+        self._original_stdout = sys.stdout
+        self._original_stderr = sys.stderr
+
+        # Replace with StringIO if they are None (frozen executable)
+        if sys.stdout is None:
+            sys.stdout = StringIO()
+        if sys.stderr is None:
+            sys.stderr = StringIO()
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Restore original stdout/stderr
+        sys.stdout = self._original_stdout
+        sys.stderr = self._original_stderr
+        return False
 
 
 class MoviePyLogger:
@@ -471,16 +498,16 @@ class VideoEditor:
             # Extract subclip (MoviePy v2.0 uses subclipped method)
             subclip = self.video_clip.subclipped(start, end)
 
-            # Export with re-encoding
-            # Use logger=None to disable MoviePy's progress bars (avoids stdout issues)
-            subclip.write_videofile(
-                output_path,
-                codec=codec,
-                audio_codec=audio_codec,
-                temp_audiofile='temp-audio.m4a',
-                remove_temp=True,
-                logger=None
-            )
+            # Export with stdout/stderr suppression for frozen executable compatibility
+            with SuppressStdout():
+                subclip.write_videofile(
+                    output_path,
+                    codec=codec,
+                    audio_codec=audio_codec,
+                    temp_audiofile='temp-audio.m4a',
+                    remove_temp=True,
+                    logger=None
+                )
 
             # Close the subclip
             subclip.close()
@@ -537,15 +564,16 @@ class VideoEditor:
                 # Extract and export subclip (MoviePy v2.0 uses subclipped method)
                 subclip = self.video_clip.subclipped(start, end)
 
-                # Use logger=None to disable MoviePy's progress bars (avoids stdout issues)
-                subclip.write_videofile(
-                    output_path,
-                    codec=codec,
-                    audio_codec=audio_codec,
-                    temp_audiofile=f'temp-audio-{clip_name}.m4a',
-                    remove_temp=True,
-                    logger=None
-                )
+                # Export with stdout/stderr suppression for frozen executable compatibility
+                with SuppressStdout():
+                    subclip.write_videofile(
+                        output_path,
+                        codec=codec,
+                        audio_codec=audio_codec,
+                        temp_audiofile=f'temp-audio-{clip_name}.m4a',
+                        remove_temp=True,
+                        logger=None
+                    )
                 subclip.close()
 
                 exported_files.append(output_path)
